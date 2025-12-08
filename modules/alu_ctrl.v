@@ -54,6 +54,24 @@ always @(*) begin
                 default:    ALUControl = 4'b0000; // Operação segura padrão
             endcase
         end
+		  2'b11: begin // Instruções com imediato (I-Type lógicas e comparações)
+				case (Funct) // Funct não é usado aqui, mas podemos reaproveitar para opcode I-Type
+					  // ANDI
+					  6'b001100: ALUControl = 4'b0000;
+					  // ORI
+					  6'b001101: ALUControl = 4'b0001;
+					  // XORI
+					  6'b001110: ALUControl = 4'b0100;
+					  // SLTI
+					  6'b001010: ALUControl = 4'b0111;
+					  // SLTIU
+					  6'b001011: ALUControl = 4'b1001;
+					  // LUI (tratado separadamente no datapath)
+					  6'b001111: ALUControl = 4'b1010; // placeholder
+					  default: ALUControl = 4'b0000;
+				endcase
+end 
+				
         
         default: ALUControl = 4'b0000; // Operação segura
     endcase
