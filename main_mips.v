@@ -1,193 +1,178 @@
-/**
- * main_mips.v
- * Módulo Top-Level do Processador MIPS Monociclo.
- * Integra PC, Memórias, ULA, RegFile e Controle.
+/*
+ * Universidade Federal Rural de Pernambuco - UFRPE
+ * Disciplina: Arquitetura e Organização de Computadores - 2025.2
+ * Projeto 02: Implementação de Processador MIPS Monociclo
+ *
+ * Grupo: 
+ *  Emanuel Rodrigues
+ *  Gustavo Henrique
+ *  Heitor Santana
+ *  João Ricardo 
+ *
+ * Data: 09/12/2025
+ *
+ * Arquivo: main_mips.v
+ * Descrição: Módulo Top-Level que integra o Datapath (Fluxo de Dados) e a 
+ * Unidade de Controle. Conecta PC, Memórias, RegFile e ULA.
  */
+
 module main_mips (
-    input  wire clk,
-    input  wire reset,
-    
-    // Saídas de visualização (conforme especificado no PDF [cite: 212])
-    output wire [31:0] pc_out,      // Valor atual do PC
-    output wire [31:0] alu_result,  // Resultado da ULA
-    output wire [31:0] d_mem_out    // Dado lido da memória (se houver)
+    input  wire        clk,              // Sinal de clock
+    input  wire        reset,            // Sinal de reset
+    output wire [31:0] pc_out,           // Saída do PC para debug
+    output wire [31:0] alu_result,       // Saída do resultado da ULA
+    output wire [31:0] d_mem_out,        // Dado lido da memória de dados
+    output wire [31:0] i_mem_out         // Instrução lida da memória de instruções
 );
 
-    // 1. Declaração de Fios (Interconexões)
+// Declaração de fios internos
+wire [31:0] w_PC_Current, w_PC_Next, w_PC_Plus4;              // Fios do PC
+wire [31:0] w_Instruction;                                     // Instrução atual
+wire [31:0] w_ReadData1, w_ReadData2;                          // Dados lidos do banco de registradores
+wire [31:0] w_SignExtended;                                    // Imediato com extensão de sinal
+wire [31:0] w_WriteDataReg;                                    // Dado a ser escrito no registrador
+wire [4:0]  w_WriteRegAddr;                                    // Endereço do registrador de escrita
 
-    
-    // PC e Instrução
-    wire [31:0] w_PC_Current, w_PC_Next, w_PC_Plus4;
-    wire [31:0] w_Instruction;
-    
-    // Decodificação e Registradores
-    wire [31:0] w_ReadData1, w_ReadData2;
-    wire [31:0] w_SignExtended;
-    wire [31:0] w_WriteDataReg;
-    wire [4:0]  w_WriteRegAddr;
-    
-    // ULA (ALU)
-    wire [31:0] w_ALU_OperandB;
-    wire [31:0] w_ALU_Result_Internal;
-    wire [3:0]  w_ALU_Control_Signal;
-    wire        w_Zero_Flag;
-    
-    // Controle
-    wire [1:0]  c_RegDst, c_MemToReg, c_ALUOp;
-    wire        c_Jump, c_JumpReg, c_Branch, c_BranchNot;
-    wire        c_MemRead, c_MemWrite, c_ALUSrc, c_RegWrite;
-    
-    // Memória de Dados
-    wire [31:0] w_MemReadData;
-    
-    // Lógica de Branch e Jump
-    wire [31:0] w_Branch_Offset;
-    wire [31:0] w_Branch_Target;
-    wire [31:0] w_Jump_Address;
-    wire [31:0] w_PC_Branch_Decision;
-    wire [31:0] w_PC_Jump_Decision;
-    wire        w_Branch_Take; // 1 se o branch deve ser tomado
+wire [31:0] w_ALU_OperandB;                                    // Segundo operando da ULA
+wire [31:0] w_ALU_Result_Internal;                             // Resultado interno da ULA
+wire [3:0]  w_ALU_Control_Signal;                              // Sinal de controle da ULA
+wire        w_Zero_Flag;                                       // Flag zero da ULA
 
-    // 2. Instanciação dos Módulos
-    // --- Estágio: Instruction Fetch (Busca) ---
-    
-    // 2.1. Program Counter (PC) 
-    pc PC_Module (
-        .clk(clk), 
-        .reset(reset), 
-        .nextPc(w_PC_Next), 
-        .pc(w_PC_Current)
-    );
-    assign pc_out = w_PC_Current; // Saída para debug
+wire [1:0]  c_RegDst;                                          // Controle do MUX RegDst
+wire [3:0]  c_ALUOp;                                           // Controle da operação da ULA
+wire [2:0]  c_MemToReg;                                        // Controle do MUX MemToReg
+wire        c_Jump, c_JumpReg, c_Branch, c_BranchNot;          // Controle de desvios
+wire        c_MemRead, c_MemWrite, c_ALUSrc, c_RegWrite;       // Controle de memória e ULA
 
-    // 2.2. Somador PC + 4 
-    adder Adder_PC4 (
-        .A(w_PC_Current), 
-        .B(32'd4), // Constante 4
-        .Resultado(w_PC_Plus4)
-    );
+wire [31:0] w_MemReadData;                                     // Dado lido da memória
+wire [31:0] w_Branch_Offset, w_Branch_Target, w_Jump_Address;  // Cálculos de desvio
+wire [31:0] w_PC_Branch_Decision, w_PC_Jump_Decision;          // Decisões de PC
+wire        w_Branch_Take;                                     // Sinal que indica se o desvio deve ser tomado
 
-    // 2.3. Memória de Instruções 
-    i_mem Instruction_Memory (
-        .address(w_PC_Current), 
-        .i_out(w_Instruction)
-    );
+wire [31:0] w_ZeroExtended;                                    // Imediato com extensão de zero
+wire        c_ImmSrc;                                          // Seleciona tipo de extensão do imediato
+wire        w_Carry;                                           // Carry do somador
 
-    // --- Estágio: Instruction Decode (Decodificação) ---
+// Instanciação do módulo PC
+pc PC_Module (
+    .clk(clk),                          // Clock
+    .reset(reset),                      // Reset
+    .nextPc(w_PC_Next),                 // Próximo valor do PC
+    .pc(w_PC_Current)                   // Valor atual do PC
+);
+assign pc_out = w_PC_Current;           // Conecta saída do PC
 
-    // 2.4. Unidade de Controle [cite: 189]
-    control Control_Unit (
-        .opcode(w_Instruction[31:26]),
-        .funct(w_Instruction[5:0]), // Necessário para detectar JR
-        .RegDst(c_RegDst),
-        .MemToReg(c_MemToReg),
-        .ALUOp(c_ALUOp),
-        .Jump(c_Jump),
-        .JumpReg(c_JumpReg),
-        .Branch(c_Branch),
-        .BranchNot(c_BranchNot),
-        .MemRead(c_MemRead),
-        .MemWrite(c_MemWrite),
-        .ALUSrc(c_ALUSrc),
-        .RegWrite(c_RegWrite)
-    );
+// Somador para PC + 4
+adder Adder_PC4 (
+    .A(w_PC_Current),                   // Entrada A (PC atual)
+    .B(32'd4),                          // Entrada B (constante 4)
+    .Resultado(w_PC_Plus4),             // Resultado da soma
+    .CarryOut(w_Carry)                  // Carry out
+);
 
-    // 2.5. Banco de Registradores [cite: 51]
-    // MUX para definir o registrador de escrita (RegDst expandido para JAL)
-    assign w_WriteRegAddr = (c_RegDst == 2'b10) ? 5'd31 :              // JAL: Escreve no $31 ($ra)
-                            (c_RegDst == 2'b01) ? w_Instruction[15:11] : // R-Type: Escreve no Rd
-                                                  w_Instruction[20:16];  // I-Type: Escreve no Rt
+// Memória de instruções
+i_mem Instruction_Memory (
+    .address(w_PC_Current),             // Endereço de leitura
+    .i_out(w_Instruction)               // Instrução lida
+);
+assign i_mem_out = w_Instruction;       // Conecta saída da instrução
 
-    // MUX para definir o DADO de escrita (MemToReg expandido para JAL)
-    assign w_WriteDataReg = (c_MemToReg == 2'b10) ? w_PC_Plus4 :    // JAL: Guarda PC+4 (Link)
-                            (c_MemToReg == 2'b01) ? w_MemReadData : // LW: Guarda dado da memória
-                                                    w_ALU_Result_Internal; // R/I: Guarda resultado ULA
+// Unidade de controle
+control Control_Unit (
+    .opcode(w_Instruction[31:26]),      // Opcode da instrução
+    .funct(w_Instruction[5:0]),         // Campo funct para instruções tipo R
+    .RegDst(c_RegDst),                  // Saída para MUX de destino do registrador
+    .MemToReg(c_MemToReg),              // Saída para MUX de origem do dado
+    .ALUOp(c_ALUOp),                    // Saída para controle da ULA
+    .Jump(c_Jump),                      // Sinal de jump
+    .JumpReg(c_JumpReg),                // Sinal de jump para registrador
+    .Branch(c_Branch),                  // Sinal de branch
+    .BranchNot(c_BranchNot),            // Sinal de branch negado
+    .MemRead(c_MemRead),                // Sinal de leitura da memória
+    .MemWrite(c_MemWrite),              // Sinal de escrita na memória
+    .ALUSrc(c_ALUSrc),                  // Sinal de seleção da entrada B da ULA
+    .RegWrite(c_RegWrite),              // Sinal de escrita no banco de registradores
+    .ImmSrc(c_ImmSrc)                   // Sinal de seleção do extensor de imediato
+);
 
-    regfile Register_File (
-        .clk(clk),
-        .reset(reset),
-        .reg_write_en(c_RegWrite),
-        .read_reg1(w_Instruction[25:21]), // Rs
-        .read_reg2(w_Instruction[20:16]), // Rt
-        .write_reg(w_WriteRegAddr),
-        .write_data(w_WriteDataReg),
-        .read_data1(w_ReadData1),
-        .read_data2(w_ReadData2)
-    );
+// MUX para selecionar o registrador de destino
+assign w_WriteRegAddr = (c_RegDst == 2'b10) ? 5'd31 :      // JAL usa $31
+                        (c_RegDst == 2'b01) ? w_Instruction[15:11] : // Tipo R
+                                              w_Instruction[20:16];   // Tipo I
 
-    // 2.6. Extensor de Sinal (Sign Extend) [cite: 48]
-    sign_extend Sign_Extender (
-        .in(w_Instruction[15:0]),
-        .out(w_SignExtended)
-    );
+// MUX para selecionar a origem do dado a ser escrito no registrador
+assign w_WriteDataReg = (c_MemToReg == 2'b10) ? w_PC_Plus4 :    // JAL usa PC+4
+                        (c_MemToReg == 2'b01) ? w_MemReadData : // LW usa memória
+                                                w_ALU_Result_Internal; // Outros usam ALU
 
-    // --- Estágio: Execution (Execução) ---
+// Banco de registradores
+regfile Register_File (
+    .clk(clk),                          // Clock
+    .reset(reset),                      // Reset
+    .reg_write_en(c_RegWrite),          // Habilita escrita
+    .read_reg1(w_Instruction[25:21]),   // Registrador 1 para leitura
+    .read_reg2(w_Instruction[20:16]),   // Registrador 2 para leitura
+    .write_reg(w_WriteRegAddr),         // Registrador para escrita
+    .write_data(w_WriteDataReg),        // Dado a ser escrito
+    .read_data1(w_ReadData1),           // Dado lido do registrador 1
+    .read_data2(w_ReadData2)            // Dado lido do registrador 2
+);
 
-    // 2.7. Controle da ULA [cite: 26]
-    alu_ctrl ALU_Controller (
-        .ALUOp(c_ALUOp),
-        .Funct(w_Instruction[5:0]),
-        .ALUControl(w_ALU_Control_Signal)
-    );
+// Extensor de sinal
+sign_extend Sign_Extender (
+    .in(w_Instruction[15:0]),           // Imediato de 16 bits
+    .out(w_SignExtended)                // Imediato estendido para 32 bits com sinal
+);
 
-    // 2.8. MUX da Entrada B da ULA (ALUSrc)
-    // Se ALUSrc=1 (LW, SW, ADDI), usa imediato estendido. Se 0, usa Rt.
-    assign w_ALU_OperandB = (c_ALUSrc) ? w_SignExtended : w_ReadData2;
+// Extensor de zero
+zero_extend Zero_Extender (
+    .in(w_Instruction[15:0]),           // Imediato de 16 bits
+    .out(w_ZeroExtended)                // Imediato estendido para 32 bits com zero
+);
 
-    // 2.9. Unidade Lógica Aritmética (ULA) [cite: 3]
-    alu Main_ALU (
-        .A(w_ReadData1), 
-        .B(w_ALU_OperandB), 
-        .shamt(w_Instruction[10:6]), // **CRÍTICO:** Conexão do shamt para shifts
-        .ALUControl(w_ALU_Control_Signal), 
-        .Resultado(w_ALU_Result_Internal), 
-        .Zero(w_Zero_Flag)
-    );
-    assign alu_result = w_ALU_Result_Internal; // Saída para debug
+// Controle da ULA
+alu_ctrl ALU_Controller (
+    .ALUOp(c_ALUOp),                    // Código da operação
+    .Funct(w_Instruction[5:0]),         // Campo funct
+    .ALUControl(w_ALU_Control_Signal)   // Sinal de controle da ULA
+);
 
-    // --- Estágio: Memory Access (Memória) ---
+// MUX para selecionar o tipo de extensão do imediato
+wire [31:0] w_Immediate;
+assign w_Immediate = c_ImmSrc ? w_ZeroExtended : w_SignExtended; // Escolhe entre zero ou sinal
 
-    // 2.10. Memória de Dados [cite: 218]
-    d_mem Data_Memory (
-        .clk(clk),
-        .address(w_ALU_Result_Internal),
-        .writeData(w_ReadData2), // Em SW, o dado vem de Rt
-        .memWrite(c_MemWrite),
-        .memRead(c_MemRead),
-        .readData(w_MemReadData)
-    );
-    assign d_mem_out = w_MemReadData; // Saída para debug
+// MUX para selecionar a entrada B da ULA
+assign w_ALU_OperandB = c_ALUSrc ? w_Immediate : w_ReadData2; // Escolhe entre imediato ou registrador
 
-    // ==========================================
-    // 3. Lógica do Próximo PC (Branch e Jump)
-    // ==========================================
+// ULA principal
+alu Main_ALU (
+    .A(w_ReadData1),                    // Operando A
+    .B(w_ALU_OperandB),                 // Operando B
+    .shamt(w_Instruction[10:6]),        // Quantidade de deslocamento
+    .ALUControl(w_ALU_Control_Signal),  // Controle da operação
+    .Resultado(w_ALU_Result_Internal),  // Resultado da operação
+    .Zero(w_Zero_Flag)                  // Flag zero
+);
+assign alu_result = w_ALU_Result_Internal; // Conecta saída da ULA
 
-    // A. Cálculo do endereço de Branch
-    // Offset = Imediato estendido deslocado 2 bits à esquerda
-    assign w_Branch_Offset = w_SignExtended << 2; 
+// Memória de dados
+d_mem Data_Memory (
+    .clk(clk),                          // Clock
+    .address(w_ALU_Result_Internal),    // Endereço de acesso
+    .writeData(w_ReadData2),            // Dado a ser escrito
+    .memWrite(c_MemWrite),              // Sinal de escrita
+    .memRead(c_MemRead),                // Sinal de leitura
+    .readData(w_MemReadData)            // Dado lido
+);
+assign d_mem_out = w_MemReadData; // Conecta saída da memória
 
-    // Somador do Branch: PC+4 + Offset
-    adder Adder_Branch (
-        .A(w_PC_Plus4),
-        .B(w_Branch_Offset),
-        .Resultado(w_Branch_Target)
-    );
-
-    // B. Decisão de Tomar ou não o Branch (BEQ ou BNE)
-    assign w_Branch_Take = (c_Branch & w_Zero_Flag) | (c_BranchNot & ~w_Zero_Flag);
-
-    // MUX do Branch: Se tomar branch, vai para Branch_Target, senão PC+4
-    assign w_PC_Branch_Decision = (w_Branch_Take) ? w_Branch_Target : w_PC_Plus4;
-
-    // C. Cálculo do endereço de Jump (J e JAL) 
-    // {PC[31:28], instrução[25:0], 00}
-    assign w_Jump_Address = { w_PC_Plus4[31:28], w_Instruction[25:0], 2'b00 };
-
-    // MUX do Jump: Se for Jump, vai para Jump_Address
-    assign w_PC_Jump_Decision = (c_Jump) ? w_Jump_Address : w_PC_Branch_Decision;
-
-    // D. MUX do JR (Jump Register)
-    // Se for JR, o PC recebe o valor do registrador Rs (ReadData1). Senão, segue lógica anterior.
-    assign w_PC_Next = (c_JumpReg) ? w_ReadData1 : w_PC_Jump_Decision;
+// Lógica de controle do PC
+assign w_Branch_Offset   = w_SignExtended << 2; // Deslocamento do branch multiplicado por 4
+assign w_Branch_Target   = w_PC_Plus4 + w_Branch_Offset; // Endereço de destino do branch
+assign w_Branch_Take     = (c_Branch & w_Zero_Flag) | (c_BranchNot & ~w_Zero_Flag); // Condição do branch
+assign w_PC_Branch_Decision = w_Branch_Take ? w_Branch_Target : w_PC_Plus4; // Escolhe entre branch ou PC+4
+assign w_Jump_Address    = {w_PC_Plus4[31:28], w_Instruction[25:0], 2'b00}; // Calcula endereço de jump
+assign w_PC_Jump_Decision = c_Jump ? w_Jump_Address : w_PC_Branch_Decision; // Escolhe entre jump ou branch
+assign w_PC_Next         = c_JumpReg ? w_ReadData1 : w_PC_Jump_Decision; // Jump para registrador sobrepõe tudo
 
 endmodule

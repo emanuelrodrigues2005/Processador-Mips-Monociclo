@@ -1,124 +1,173 @@
-/**
- * control.v
- * Unidade de Controle Principal do MIPS Monociclo.
- * Responsável por decodificar o Opcode e gerar sinais para os MUXes e Memórias.
+/*
+ * Universidade Federal Rural de Pernambuco - UFRPE
+ * Disciplina: Arquitetura e Organização de Computadores - 2025.2
+ * Projeto 02: Implementação de Processador MIPS Monociclo
+ *
+ * Grupo: 
+ *  Emanuel Rodrigues
+ *  Gustavo Henrique
+ *  Heitor Santana
+ *  João Ricardo 
+ * 
+ * Data: 09/12/2025
+ *
+ * Arquivo: control.v
+ * Descrição: Unidade de Controle Principal. Decodifica o Opcode (bits 31-26) e gera
+ * os sinais de controle para multiplexadores, memórias e ULA.
  */
+
 module control (
-    input  wire [5:0] opcode,  // Bits 31-26 da instrução [cite: 87]
-    input  wire [5:0] funct,   // Bits 5-0 (Necessário apenas para identificar JR)
+    input  wire [5:0] opcode,   // Opcode da instrução (bits 31-26)
+    input  wire [5:0] funct,    // Campo funct para instruções tipo R (bits 5-0)
     
-    // Sinais de Saída para o Datapath
-    output reg [1:0] RegDst,   // 00=rt, 01=rd, 10=$31 (para JAL)
-    output reg [2:0] MemToReg, // 00=ULA, 01=Mem, 10=PC+4 (para JAL)
-    output reg [1:0] ALUOp,    // 00=Add/LW/SW, 01=Branch, 10=R-Type
-    output reg       ALUSrc,   // 0=RegB, 1=Imediato
-    output reg       RegWrite, // Habilita escrita no banco de registradores
-    output reg       MemRead,  // Habilita leitura da memória de dados
-    output reg       MemWrite, // Habilita escrita na memória de dados
-    output reg       Branch,   // Sinal para BEQ
-    output reg       BranchNot,// Sinal para BNE [cite: 101]
-    output reg       Jump,     // Sinal para J e JAL
-    output reg       JumpReg   // Sinal exclusivo para JR (Jump Register)
+    output reg [1:0] RegDst,    // Seleção do registrador de destino
+    output reg [2:0] MemToReg,  // Seleção da origem do dado para escrita no registrador
+    output reg [3:0] ALUOp,     // Código da operação da ULA
+    output reg       ALUSrc,    // Seleção da entrada B da ULA (registrador ou imediato)
+    output reg       RegWrite,  // Habilita escrita no banco de registradores
+    output reg       MemRead,   // Habilita leitura da memória de dados
+    output reg       MemWrite,  // Habilita escrita na memória de dados
+    output reg       Branch,    // Indica instrução de branch (BEQ)
+    output reg       BranchNot, // Indica instrução de branch negado (BNE)
+    output reg       Jump,      // Indica instrução de jump (J)
+    output reg       JumpReg,   // Indica jump para registrador (JR)
+    output reg       ImmSrc     // Seleção do tipo de extensão do imediato (zero ou sinal)
 );
 
-    // Definição dos Opcodes 
-    localparam R_TYPE = 6'b000000;
-    localparam LW     = 6'b100011; // I.10 [cite: 101]
-    localparam SW     = 6'b101011; // I.11 [cite: 102]
-    localparam BEQ    = 6'b000100; // I.5
-    localparam BNE    = 6'b000101; // I.6
-    localparam ADDI   = 6'b001000; // I.1
-    localparam ANDI   = 6'b001100; // I.2
-    localparam J      = 6'b000010; // J.1 
-    localparam JAL    = 6'b000011; // J.2
-    
-    // Funct específico para JR (R-Type)
-    localparam FUNCT_JR = 6'b001000; // R.15 [cite: 94]
+// Definição dos opcodes
+localparam R_TYPE = 6'b000000; // Tipo R
+localparam LW     = 6'b100011; // Load Word
+localparam SW     = 6'b101011; // Store Word
+localparam BEQ    = 6'b000100; // Branch on Equal
+localparam BNE    = 6'b000101; // Branch on Not Equal
+localparam ADDI   = 6'b001000; // Add Immediate
+localparam ANDI   = 6'b001100; // AND Immediate
+localparam ORI    = 6'b001101; // OR Immediate
+localparam XORI   = 6'b001110; // XOR Immediate
+localparam SLTI   = 6'b001010; // Set Less Than Immediate
+localparam SLTIU  = 6'b001011; // Set Less Than Immediate Unsigned
+localparam LUI    = 6'b001111; // Load Upper Immediate
+localparam J      = 6'b000010; // Jump
+localparam JAL    = 6'b000011; // Jump and Link
 
-    always @(*) begin
-        // 1. Resetar todos os sinais para 0 (evita latches e estados indefinidos)
-        RegDst   = 2'b00;
-        MemToReg = 3'b000;
-        ALUOp    = 2'b00;
-        ALUSrc   = 0;
-        RegWrite = 0;
-        MemRead  = 0;
-        MemWrite = 0;
-        Branch   = 0;
-        BranchNot= 0;
-        Jump     = 0;
-        JumpReg  = 0;
+localparam FUNCT_JR = 6'b001000; // Código de Jump Register (JR)
 
-        // 2. Decodificação baseada no Opcode
-        case (opcode)
-            R_TYPE: begin
-                // Verifica se é JR (Jump Register)
-                if (funct == FUNCT_JR) begin
-                    JumpReg = 1; // Ativa sinal para pular para valor do registrador
-                    // JR não escreve em reg e não usa ULA padrão
-					 end 
-                else begin
-                    RegDst   = 2'b01; // Destino é rd (bits 15-11)
-                    RegWrite = 1;     // Escreve no registrador
-                    ALUOp    = 2'b10; // Instrui ALU_Ctrl a olhar o campo Funct
-                    MemToReg = 3'b000;
-                end
-            end
+// Bloco always para definição dos sinais de controle
+always @(*) begin
+    // Inicialização dos sinais com valores padrão
+    RegDst   = 2'b00;   // Registrador de destino padrão (rt)
+    MemToReg = 3'b000;  // Origem do dado padrão (ULA)
+    ALUOp    = 4'b000;  // Operação padrão (ADD)
+    ALUSrc   = 0;       // Entrada B da ULA é do registrador
+    RegWrite = 0;       // Não escreve no banco de registradores
+    MemRead  = 0;       // Não lê da memória
+    MemWrite = 0;       // Não escreve na memória
+    Branch   = 0;       // Não é branch
+    BranchNot= 0;       // Não é branch negado
+    Jump     = 0;       // Não é jump
+    JumpReg  = 0;       // Não é jump para registrador
+    ImmSrc   = 0;       // Usa extensão de sinal por padrão
 
-            LW: begin
-                ALUSrc   = 1;     // Usa Imediato (endereço + offset)
-                MemToReg = 3'b001; // Dado vem da Memória
-                RegWrite = 1;     // Escreve no Rt
-                MemRead  = 1;     // Habilita leitura da RAM
-                ALUOp    = 2'b00; // ALU deve somar
-            end
-
-            SW: begin
-                ALUSrc   = 1;     // Usa Imediato (endereço + offset)
-                MemWrite = 1;     // Habilita escrita na RAM
-                ALUOp    = 2'b00; // ALU deve somar
-                // RegWrite=0 (não escreve em registrador)
-            end
-
-            BEQ: begin
-                Branch   = 1;     // Sinaliza Branch Equal
-                ALUOp    = 2'b01; // ALU deve subtrair para comparar
-                // RegWrite=0
-            end
-            
-            BNE: begin
-                BranchNot = 1;    // Sinaliza Branch Not Equal
-                ALUOp     = 2'b01; // ALU deve subtrair para comparar
-            end
-
-            ADDI: begin
-                ALUSrc   = 1;     // Usa Imediato
-                RegWrite = 1;     // Escreve no Rt
-                ALUOp    = 2'b00; // Soma
-            end
-            
-            // Tratamento simplificado para ANDI, ORI, XORI (Tipo I Lógicos)
-            // Normalmente requerem ALUOp específico, aqui generalizado:
-            ANDI: begin 
-					ALUSrc=1;
-					RegWrite=1;
-					ALUOp=2'b11;
-				end // Requer ajuste no ALU Ctrl se implementar full
-
-            J: begin
-                Jump = 1; // Ativa lógica de Jump incondicional
-            end
-
-            JAL: begin
-                Jump     = 1;
-                RegDst   = 2'b10; // Destino forçado para $31 ($ra)
-                MemToReg = 3'b010; // Dado a escrever é PC+4 (Link)
+    // Case principal baseado no opcode
+    case (opcode)
+        R_TYPE: begin
+            if (funct == FUNCT_JR) begin
+                JumpReg = 1; // Ativa jump para registrador
+            end 
+            else begin
+                RegDst   = 2'b01; // Registrador rd é destino
                 RegWrite = 1;     // Habilita escrita
+                ALUOp    = 4'b0010; // Indica tipo R (usa funct)
+                MemToReg = 3'b000; // Dado vem da ULA
             end
+        end
+
+        LW: begin
+            ALUSrc   = 1;     // Usa imediato
+            MemToReg = 3'b001; // Dado vem da memória
+            RegWrite = 1;     // Habilita escrita
+            MemRead  = 1;     // Habilita leitura da memória
+            ALUOp    = 3'b000; // Operação ADD
+        end
+
+        SW: begin
+            ALUSrc   = 1;     // Usa imediato
+            MemWrite = 1;     // Habilita escrita na memória
+            ALUOp    = 3'b000; // Operação ADD
+        end
+
+        BEQ: begin
+            Branch   = 1;     // Ativa branch
+            ALUOp    = 3'b001; // Operação SUB
+        end
+        
+        BNE: begin
+            BranchNot = 1;    // Ativa branch negado
+            ALUOp     = 3'b001; // Operação SUB
+        end
+
+        ADDI: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b000; // Operação ADD
+        end
+        
+        ANDI: begin 
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b011; // Operação AND
+            ImmSrc   = 1;     // Usa extensão de zero
+        end
+				
+        ORI: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b100; // Operação OR
+            ImmSrc   = 1;     // Usa extensão de zero
+        end
+				
+        XORI: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b101; // Operação XOR
+            ImmSrc   = 1;     // Usa extensão de zero
+        end
+				
+        SLTI: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b110; // Operação SLT
+            ImmSrc   = 0;     // Usa extensão de sinal
+        end
+				
+        SLTIU: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 4'b1000; // Operação SLTU
+            ImmSrc   = 0;     // Usa extensão de sinal
+        end
+
+        LUI: begin
+            ALUSrc   = 1;     // Usa imediato
+            RegWrite = 1;     // Habilita escrita
+            ALUOp    = 3'b111; // Operação LUI
+        end
+
+        J: begin
+            Jump = 1;         // Ativa jump
+        end
+
+        JAL: begin
+            Jump     = 1;     // Ativa jump
+            RegDst   = 2'b10; // Registrador $31 é destino
+            MemToReg = 3'b010; // Dado vem de PC+4
+            RegWrite = 1;     // Habilita escrita
+        end
             
-            default: begin
-                // Mantém tudo zero por segurança
-            end
-        endcase
-    end
+        default: begin
+            // Nada faz para instruções desconhecidas
+        end
+    endcase
+end
+
 endmodule
