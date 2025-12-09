@@ -35,11 +35,11 @@ reg [31:0] registers [31:0];
 integer i;
 
 // Leitura assíncrona do registrador 1
-// Se o endereço for 0, retorna 0 (registrador x0 é sempre zero)
+// Se o endereço for 0, retorna 0 (registrador s0 é sempre zero)
 assign read_data1 = (read_reg1 == 0) ? 32'b0 : registers[read_reg1];
 
 // Leitura assíncrona do registrador 2
-// Se o endereço for 0, retorna 0 (registrador x0 é sempre zero)
+// Se o endereço for 0, retorna 0 (registrador s0 é sempre zero)
 assign read_data2 = (read_reg2 == 0) ? 32'b0 : registers[read_reg2];
 
 // Bloco always para escrita síncrona e reset
@@ -51,7 +51,7 @@ always @(posedge clk or posedge reset) begin
         end
     end
     else begin
-        // Escrita síncrona, somente se habilitada e o registrador não for o x0
+        // Escrita síncrona, somente se habilitada e o registrador não for o s0
         if (reg_write_en && write_reg != 0) begin
             registers[write_reg] <= write_data;
         end

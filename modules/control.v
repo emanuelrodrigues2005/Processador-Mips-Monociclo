@@ -57,7 +57,7 @@ always @(*) begin
     // Inicialização dos sinais com valores padrão
     RegDst   = 2'b00;   // Registrador de destino padrão (rt)
     MemToReg = 3'b000;  // Origem do dado padrão (ULA)
-    ALUOp    = 4'b000;  // Operação padrão (ADD)
+    ALUOp    = 4'b0000;  // Operação padrão (ADD)
     ALUSrc   = 0;       // Entrada B da ULA é do registrador
     RegWrite = 0;       // Não escreve no banco de registradores
     MemRead  = 0;       // Não lê da memória
@@ -87,29 +87,29 @@ always @(*) begin
             MemToReg = 3'b001; // Dado vem da memória
             RegWrite = 1;     // Habilita escrita
             MemRead  = 1;     // Habilita leitura da memória
-            ALUOp    = 3'b000; // Operação ADD
+            ALUOp    = 4'b0000; // Operação ADD
         end
 
         SW: begin
             ALUSrc   = 1;     // Usa imediato
             MemWrite = 1;     // Habilita escrita na memória
-            ALUOp    = 3'b000; // Operação ADD
+            ALUOp    = 4'b0000; // Operação ADD
         end
 
         BEQ: begin
             Branch   = 1;     // Ativa branch
-            ALUOp    = 3'b001; // Operação SUB
+            ALUOp    = 4'b0001; // Operação SUB
         end
         
         BNE: begin
             BranchNot = 1;    // Ativa branch negado
-            ALUOp     = 3'b001; // Operação SUB
+            ALUOp     = 4'b0001; // Operação SUB
         end
 
         ADDI: begin
             ALUSrc   = 1;     // Usa imediato
             RegWrite = 1;     // Habilita escrita
-            ALUOp    = 3'b000; // Operação ADD
+            ALUOp    = 4'b0000; // Operação ADD
         end
         
         ANDI: begin 
@@ -122,21 +122,21 @@ always @(*) begin
         ORI: begin
             ALUSrc   = 1;     // Usa imediato
             RegWrite = 1;     // Habilita escrita
-            ALUOp    = 3'b100; // Operação OR
+            ALUOp    = 4'b0100; // Operação OR
             ImmSrc   = 1;     // Usa extensão de zero
         end
 				
         XORI: begin
             ALUSrc   = 1;     // Usa imediato
             RegWrite = 1;     // Habilita escrita
-            ALUOp    = 3'b101; // Operação XOR
+            ALUOp    = 4'b0101; // Operação XOR
             ImmSrc   = 1;     // Usa extensão de zero
         end
 				
         SLTI: begin
             ALUSrc   = 1;     // Usa imediato
             RegWrite = 1;     // Habilita escrita
-            ALUOp    = 3'b110; // Operação SLT
+            ALUOp    = 4'b0110; // Operação SLT
             ImmSrc   = 0;     // Usa extensão de sinal
         end
 				
@@ -150,7 +150,7 @@ always @(*) begin
         LUI: begin
             ALUSrc   = 1;     // Usa imediato
             RegWrite = 1;     // Habilita escrita
-            ALUOp    = 3'b111; // Operação LUI
+            ALUOp    = 4'b0111; // Operação LUI
         end
 
         J: begin
