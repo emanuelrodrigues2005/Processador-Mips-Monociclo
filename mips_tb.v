@@ -74,7 +74,7 @@ module mips_tb; // Módulo de teste do processador MIPS
             // Imprime todos os registradores
             $display("Banco de Registradores (Completo):");
             for (i = 0; i < 32; i = i + 1) begin
-                $display("  x%2d: %h", i, DUT.Register_File.registers[i]); // Valor de cada registrador
+                $display("  $%2d: %h", i, DUT.Register_File.registers[i]); // Valor de cada registrador
             end
         end
     endtask
