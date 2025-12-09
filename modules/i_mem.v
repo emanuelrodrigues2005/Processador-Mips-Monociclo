@@ -28,7 +28,7 @@ reg [31:0] rom_memory [0:MEM_SIZE-1];
 
 // Inicialização da memória com arquivo externo
 initial begin
-    $readmemb("/home/zauns/Desktop/aoc/Processador-Mips-Monociclo/modules/instruction.list", rom_memory);
+    $readmemb("C:/Users/User/Documents/GitHub/Processador-Mips-Monociclo/modules/instruction.list", rom_memory);
 end
 
 // Leitura da instrução com base no endereço
