@@ -101,8 +101,8 @@ assign w_WriteRegAddr = (c_RegDst == 2'b10) ? 5'd31 :      // JAL usa $31
                                               w_Instruction[20:16];   // Tipo I
 
 // MUX para selecionar a origem do dado a ser escrito no registrador
-assign w_WriteDataReg = (c_MemToReg == 2'b10) ? w_PC_Plus4 :    // JAL usa PC+4
-                        (c_MemToReg == 2'b01) ? w_MemReadData : // LW usa memória
+assign w_WriteDataReg = (c_MemToReg == 3'b010) ? w_PC_Plus4 :    // JAL usa PC+4
+                        (c_MemToReg == 3'b001) ? w_MemReadData : // LW usa memória
                                                 w_ALU_Result_Internal; // Outros usam ALU
 
 // Banco de registradores
