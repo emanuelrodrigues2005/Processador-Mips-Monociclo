@@ -1,6 +1,6 @@
 /*
  * mips_tb.v
- * Testbench para validação da Etapa 1 (zero-extend) – com debug completo
+ * Testbench abrangente para validação do processador MIPS completo – com debug detalhado
  * Arquitetura de Computadores - UFRPE 2025.2
  */
 
