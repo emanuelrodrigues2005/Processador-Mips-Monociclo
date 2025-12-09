@@ -165,7 +165,8 @@ always @(*) begin
         end
             
         default: begin
-            // Nada faz para instruções desconhecidas
+            // Para instruções desconhecidas, todos os sinais permanecem em seus valores padrão (zeros).
+            // ATENÇÃO: Isso pode causar comportamento inesperado se um opcode não suportado for fornecido.
         end
     endcase
 end
