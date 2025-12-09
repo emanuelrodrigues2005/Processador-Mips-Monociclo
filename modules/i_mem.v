@@ -1,18 +1,38 @@
-//Módulo da memória de instruções (Comportamento de ROM - Apenas Leitura)
-//MEM_SIZE -> Parâmetro que define a quantidade de linhas da memória (padrão 128)
-//Entrada: address (endereço de byte vindo do PC)
-//Saída: i_out (instrução de 32 bits lida da memória)
-module i_mem #(parameter MEM_SIZE = 128)(input wire [31:0] address , output wire [31:0] i_out);
-	
-	//Declara a matriz de memória: 'MEM_SIZE' linhas, cada uma com 32 bits de largura
-	reg [31:0] rom_memory [0:MEM_SIZE-1];
-	
-	initial begin
-		//Carrega o binário do arquivo externo para preencher a memória no início da simulação
-		$readmemb("instruction.list", rom_memory);
-	end
-	
-	//A saída recebe o valor lido da memória
-	//O endereço é dividido por 4 (descarta bits 0 e 1) para ajustar o endereçamento de Byte para Palavra
-	assign i_out = rom_memory[address[31:2]];
+/*
+ * Universidade Federal Rural de Pernambuco - UFRPE
+ * Disciplina: Arquitetura e Organização de Computadores - 2025.2
+ * Projeto 02: Implementação de Processador MIPS Monociclo
+ *
+ * Grupo: 
+ *  Emanuel Rodrigues
+ *  Gustavo Henrique
+ *  Heitor Santana
+ *  João Ricardo 
+ * 
+ * Data: 09/12/2025
+ *
+ * Arquivo: i_mem.v
+ * Descrição: Memória de Instruções (ROM). Lê as instruções a partir de um arquivo
+ * externo e fornece o código de máquina de 32 bits baseado no endereço do PC.
+ */
+
+module i_mem #(
+    parameter MEM_SIZE = 128 // Número de posições de memória (cada uma de 32 bits)
+)(
+    input wire [31:0] address, // Endereço de entrada (do PC)
+    output wire [31:0] i_out   // Instrução de saída
+);
+
+// Declaração da memória de instruções (ROM)
+reg [31:0] rom_memory [0:MEM_SIZE-1];
+
+// Inicialização da memória com arquivo externo
+initial begin
+    $readmemb("/home/zauns/Desktop/aoc/Processador-Mips-Monociclo/modules/instruction.list", rom_memory);
+end
+
+// Leitura da instrução com base no endereço
+// Desloca o endereço 2 bits para direita (divide por 4) para alinhar com palavras de 32 bits
+assign i_out = rom_memory[address[31:2]];
+
 endmodule
