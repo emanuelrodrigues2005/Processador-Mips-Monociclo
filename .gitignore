@@ -1,0 +1,55 @@
+# --- Quartus Prime Generated Folders (Lixo gerado na compilação) ---
+/db/
+/incremental_db/
+/output_files/
+/simulation/
+/.qsys_edit/
+/greybox_tmp/
+
+# --- Quartus Temporary & Backup Files ---
+*.bak
+*.qws
+*.ppf
+*.ddb
+*.csv
+*.cmp
+*.sip
+*.spd
+*.bsf
+*.f
+*.hdl
+*.inv
+*.lai
+*.loa
+*.lof
+*.log
+*.map
+*.o
+*.pc
+*.smsg
+*.summary
+*.tdf
+*.tcl~
+*.txt
+!CMakeLists.txt
+!instruction.list
+
+# --- Binary Output Files (Bitstreams) ---
+*.sof
+*.pof
+*.jdi
+*.pin
+*.done
+
+# --- Reports ---
+*.rpt
+*.htm
+*.html
+
+# --- Specific Garbage Files from your image ---
+c5_pin_model_dump.txt
+
+# --- OS & Editor Files ---
+.DS_Store
+Thumbs.db
+.vscode/
