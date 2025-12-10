@@ -69,6 +69,7 @@ set_global_assignment -name EDA_TEST_BENCH_NAME mips_tb -section_id eda_simulati
 set_global_assignment -name EDA_DESIGN_INSTANCE_NAME mips_tb -section_id mips_tb
 set_global_assignment -name EDA_TEST_BENCH_MODULE_NAME mips_tb -section_id mips_tb
 set_global_assignment -name EDA_TEST_BENCH_FILE mips_tb.v -section_id mips_tb
+set_global_assignment -name SOURCE_FILE instructions.list
 set_global_assignment -name VERILOG_FILE modules/zero_extend.v
 set_global_assignment -name VERILOG_FILE main_mips.v
 set_global_assignment -name VERILOG_FILE modules/pc.v

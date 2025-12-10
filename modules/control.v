@@ -49,8 +49,7 @@ localparam SLTIU  = 6'b001011; // Set Less Than Immediate Unsigned
 localparam LUI    = 6'b001111; // Load Upper Immediate
 localparam J      = 6'b000010; // Jump
 localparam JAL    = 6'b000011; // Jump and Link
-
-localparam FUNCT_JR = 6'b001000; // Código de Jump Register (JR)
+localparam JR = 6'b001000; // Jump Register
 
 // Bloco always para definição dos sinais de controle
 always @(*) begin
@@ -71,7 +70,7 @@ always @(*) begin
     // Case principal baseado no opcode
     case (opcode)
         R_TYPE: begin
-            if (funct == FUNCT_JR) begin
+            if (funct == JR) begin
                 JumpReg = 1; // Ativa jump para registrador
             end 
             else begin
